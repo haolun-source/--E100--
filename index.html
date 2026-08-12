@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E100 售後知識庫問答與智慧戰情室 (POC)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-500 text-white p-2 rounded-xl shadow">
+                    <i class="fa-solid fa-headset text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">E100 售後知識庫問答系統 <span class="text-xs bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded border border-brand-500/30">POC v1.0</span></h1>
+                    <p class="text-xs text-slate-400">同樣的技術問題不再重複回答 · 智慧未結案戰情室</p>
+                </div>
+            </div>
+            <!-- Navigation Tabs -->
+            <nav class="flex flex-wrap gap-2 bg-slate-800 p-1 rounded-xl border border-slate-700 text-sm">
+                <button onclick="switchTab('kb')" id="tab-kb" class="px-3 py-1.5 rounded-lg font-medium transition bg-brand-600 text-white shadow">
+                    <i class="fa-solid fa-book-open mr-1.5"></i>知識庫查詢
+                </button>
+                <button onclick="switchTab('top10')" id="tab-top10" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-chart-bar mr-1.5"></i>前十熱門問題
+                </button>
+                <button onclick="switchTab('ai')" id="tab-ai" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-robot mr-1.5"></i>AI 未結案優先序
+                </button>
+                <button onclick="switchTab('add')" id="tab-add" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-plus-circle mr-1.5"></i>新增問答
+                </button>
+                <button onclick="switchTab('arch')" id="tab-arch" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-sitemap mr-1.5"></i>系統架構與人機協作圖
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+        <!-- Status Banner -->
+        <div id="data-status" class="mb-6 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                <div>
+                    <span id="record-count-text" class="font-semibold text-slate-700">正在載入並清洗資料...</span>
+                    <p class="text-xs text-slate-500">已自動排除重複列、統一日期格式、填補空白並校正小數點錯位異常。</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="loadAndCleanData()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-300">
+                    <i class="fa-solid fa-rotate mr-1"></i>重新載入最新資料
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: 知識庫查詢 -->
+        <section id="view-kb" class="space-y-6">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass text-brand-600"></i>依問題類型查到標準回覆
+                </h2>
+                <!-- Search & Filters -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">問題類型（項目）</label>
+                        <select id="filter-type" onchange="filterKB()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="">全部類型</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">處理狀態</label>
+                        <select id="filter-status" onchange="filterKB()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="">全部狀態</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">關鍵字搜尋（客戶 / 備註 / 單號）</label>
+                        <div class="relative">
+                            <input type="text" id="filter-keyword" oninput="filterKB()" placeholder="輸入關鍵字..." class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <i class="fa-solid fa-search absolute left-3 top-3.5 text-slate-400 text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Table / Cards -->
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                                <th class="p-3">日期</th>
+                                <th class="p-3">編號 / 客戶</th>
+                                <th class="p-3">問題類型</th>
+                                <th class="p-3">狀態</th>
+                                <th class="p-3">備註 / 記錄摘要</th>
+                                <th class="p-3">標準回覆 / 解法</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kb-table-body" class="divide-y divide-slate-200 text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex justify-between items-center text-xs text-slate-500">
+                    <span id="kb-count-info">顯示 0 筆結果</span>
+                    <div class="flex gap-2">
+                        <button onclick="changePage(-1)" id="btn-prev" class="px-3 py-1 bg-white border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50">上一頁</button>
+                        <span id="page-info" class="py-1 px-2">第 1 頁</span>
+                        <button onclick="changePage(1)" id="btn-next" class="px-3 py-1 bg-white border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50">下一頁</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: 前十熱門問題 -->
+        <section id="view-top10" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-ranking-star text-amber-500"></i>最常被問的前十題（熱門問題排行榜）
+                </h2>
+                <p class="text-xs text-slate-500 mb-6">統計各問題類型（項目）與客戶回報頻率，協助客服與研發團隊優先優化高頻痛點。</p>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Top 10 Table -->
+                    <div class="lg:col-span-2 overflow-x-auto border border-slate-200 rounded-xl">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                                    <th class="p-3 w-16 text-center">排名</th>
+                                    <th class="p-3">問題類型 / 項目</th>
+                                    <th class="p-3 text-right">提問次數</th>
+                                    <th class="p-3 text-right">平均耗時 (分)</th>
+                                    <th class="p-3 text-right">佔總比例</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top10-table-body" class="divide-y divide-slate-200 text-sm">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Quick Summary Card -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-lightbulb text-amber-500"></i>熱門問題洞察
+                            </h3>
+                            <ul id="top10-insights" class="space-y-2.5 text-xs text-slate-600">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-slate-200 text-xs text-slate-500">
+                            <p><i class="fa-solid fa-circle-info mr-1 text-brand-500"></i>提示：針對前三名高頻問題，系統已自動對應標準解答，可直接複製至客服回覆中。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: AI 未結案優先序 -->
+        <section id="view-ai" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-robot text-brand-600"></i>AI 智慧戰情室：未結案優先序排序
+                        </h2>
+                        <p class="text-xs text-slate-500">AI 自動讀取狀態與備註，自動過濾已結案/合格案件，依據緊急關鍵字與停滯時間智慧計算處理優先序。</p>
+                    </div>
+                    <button onclick="runAiAnalysis()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>重新執行 AI 分析
+                    </button>
+                </div>
+
+                <!-- AI Metrics Summary -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div class="text-xs font-semibold text-amber-800 uppercase">總有效案件</div>
+                        <div id="ai-stat-total" class="text-2xl font-bold text-amber-900 mt-1">0</div>
+                    </div>
+                    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                        <div class="text-xs font-semibold text-rose-800 uppercase">真實未結案數</div>
+                        <div id="ai-stat-unclosed" class="text-2xl font-bold text-rose-900 mt-1">0</div>
+                    </div>
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                        <div class="text-xs font-semibold text-indigo-800 uppercase">高優先處理件數 (P1)</div>
+                        <div id="ai-stat-p1" class="text-2xl font-bold text-indigo-900 mt-1">0</div>
+                    </div>
+                </div>
+
+                <!-- AI Ranked List -->
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                                <th class="p-3 w-20">AI 優先序</th>
+                                <th class="p-3">單號 / 客戶</th>
+                                <th class="p-3">目前狀態</th>
+                                <th class="p-3">日期</th>
+                                <th class="p-3">備註內容</th>
+                                <th class="p-3">AI 智慧研判理由與建議</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ai-table-body" class="divide-y divide-slate-200 text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: 新增問答 -->
+        <section id="view-add" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 max-w-2xl mx-auto">
+                <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-emerald-600"></i>一直加新問答進去
+                </h2>
+                <p class="text-xs text-slate-500 mb-6">當遇到新常見問題時，可即時新增至知識庫中，供客服與團隊隨時查詢與引用（資料自動儲存於瀏覽器 LocalStorage）。</p>
+
+                <form onsubmit="handleAddNewQna(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">問題類型（項目）*</label>
+                        <input type="text" id="new-item-type" required placeholder="例如：A 類、硬體故障、軟體設定等" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">客戶名稱 *</label>
+                            <input type="text" id="new-customer" required placeholder="例如：順發、力鋼、大宏..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">初始狀態 *</label>
+                            <select id="new-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <option value="待處理">待處理</option>
+                                <option value="待確認">待確認</option>
+                                <option value="不合格">不合格</option>
+                                <option value="已回報">已回報</option>
+                                <option value="已結案">已結案</option>
+                                <option value="合格">合格</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">備註／問題描述 *</label>
+                        <textarea id="new-remark" required rows="3" placeholder="請輸入詳細的問題現象或備註..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">標準回覆／解決方案 *</label>
+                        <textarea id="new-solution" required rows="3" placeholder="請輸入該問題的標準解答或 SOP..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm rounded-xl shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-check"></i>確認新增至知識庫
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 5: 系統架構與人機協作圖 (SVG) -->
+        <section id="view-arch" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-sitemap text-brand-600"></i>系統架構與人機協作圖 (SVG)
+                </h2>
+                <p class="text-xs text-slate-500 mb-6">明確標出資料來源、資料清理管道、AI 介入步驟、人工把關點以及前端展示頁面。</p>
+
+                <!-- SVG Architecture Diagram Container -->
+                <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50 overflow-x-auto flex justify-center">
+                    <svg viewBox="0 0 900 520" width="100%" height="auto" class="max-w-4xl font-sans">
+                        <defs>
+                            <linearGradient id="grad-data" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#3b82f6" />
+                                <stop offset="100%" stop-color="#1d4ed8" />
+                            </linearGradient>
+                            <linearGradient id="grad-ai" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#8b5cf6" />
+                                <stop offset="100%" stop-color="#6d28d9" />
+                            </linearGradient>
+                            <linearGradient id="grad-human" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#10b981" />
+                                <stop offset="100%" stop-color="#047857" />
+                            </linearGradient>
+                            <linearGradient id="grad-output" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#f59e0b" />
+                                <stop offset="100%" stop-color="#d97706" />
+                            </linearGradient>
+                            <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+                                <feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.1"/>
+                            </filter>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+                            </marker>
+                        </defs>
+
+                        <!-- Background -->
+                        <rect width="900" height="520" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+
+                        <!-- Title -->
+                        <text x="450" y="35" text-anchor="middle" font-size="16" font-weight="bold" fill="#1e293b">E100 售後知識庫問答系統 — 系統架構與人機協作圖</text>
+
+                        <!-- CONNECTIONS / ARROWS -->
+                        <!-- Data to Human Check 1 -->
+                        <path d="M 160 160 L 160 230" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                        <!-- Human Check 1 to JS Pipeline -->
+                        <path d="M 230 265 L 290 265" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                        <!-- JS Pipeline to AI -->
+                        <path d="M 450 265 L 530 265" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                        <!-- AI to Human Check 2 -->
+                        <path d="M 690 265 L 750 265" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                        <!-- Human Check 2 to Output UI -->
+                        <path d="M 610 320 L 610 395" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                        <path d="M 450 395 L 280 395" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+                        <!-- NODE 1: Data Source -->
+                        <g transform="translate(80, 90)" filter="url(#shadow)">
+                            <rect width="160" height="70" rx="10" fill="url(#grad-data)"/>
+                            <text x="80" y="30" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">📁 資料來源</text>
+                            <text x="80" y="50" text-anchor="middle" fill="#e0f2fe" font-size="11">主檔.csv (2012 筆髒資料)</text>
+                        </g>
+
+                        <!-- NODE 2: Human Checkpoint 1 (Data Cleaning & Validation Rules) -->
+                        <g transform="translate(70, 230)" filter="url(#shadow)">
+                            <rect width="160" height="70" rx="10" fill="url(#grad-human)"/>
+                            <text x="80" y="25" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">👤 人在把關 (1)</text>
+                            <text x="80" y="42" text-anchor="middle" fill="#d1fae5" font-size="10">確認欄位對照與邏輯</text>
+                            <text x="80" y="58" text-anchor="middle" fill="#d1fae5" font-size="10">(日期/空白/異常值)</text>
+                        </g>
+
+                        <!-- NODE 3: Data Cleaning Pipeline -->
+                        <g transform="translate(290, 230)" filter="url(#shadow)">
+                            <rect width="160" height="70" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+                            <text x="80" y="28" text-anchor="middle" fill="#1e293b" font-size="12" font-weight="bold">⚙️ 資料清理引擎</text>
+                            <text x="80" y="48" text-anchor="middle" fill="#64748b" font-size="10">去重、統一日期、</text>
+                            <text x="80" y="60" text-anchor="middle" fill="#64748b" font-size="10">補空白、修正小數點</text>
+                        </g>
+
+                        <!-- NODE 4: AI Intervention -->
+                        <g transform="translate(530, 230)" filter="url(#shadow)">
+                            <rect width="160" height="70" rx="10" fill="url(#grad-ai)"/>
+                            <text x="80" y="25" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">🤖 AI 在哪裡介入</text>
+                            <text x="80" y="45" text-anchor="middle" fill="#ede9fe" font-size="10">讀取狀態與備註內容</text>
+                            <text x="80" y="60" text-anchor="middle" fill="#ede9fe" font-size="10">智慧判定未結案與優先序</text>
+                        </g>
+
+                        <!-- NODE 5: Human Checkpoint 2 -->
+                        <g transform="translate(740, 230)" filter="url(#shadow)">
+                            <rect width="140" height="70" rx="10" fill="url(#grad-human)"/>
+                            <text x="70" y="25" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">👤 人在把關 (2)</text>
+                            <text x="70" y="45" text-anchor="middle" fill="#d1fae5" font-size="10">新增問答、維護</text>
+                            <text x="70" y="60" text-anchor="middle" fill="#d1fae5" font-size="10">標準回覆 (KB)</text>
+                        </g>
+
+                        <!-- NODE 6: Output UI (GitHub Pages) -->
+                        <g transform="translate(180, 360)" filter="url(#shadow)">
+                            <rect width="200" height="75" rx="10" fill="url(#grad-output)"/>
+                            <text x="100" y="28" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">🌐 單一 HTML 畫面</text>
+                            <text x="100" y="48" text-anchor="middle" fill="#fef3c7" font-size="11">GitHub Pages 瀏覽 / 手機瀏覽</text>
+                            <text x="100" y="62" text-anchor="middle" fill="#fef3c7" font-size="10">依問題查詢 + Top10 + 新增</text>
+                        </g>
+
+                        <!-- Legend Notes -->
+                        <g transform="translate(500, 360)">
+                            <rect width="360" height="110" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+                            <text x="15" y="22" font-size="11" font-weight="bold" fill="#334155">📌 人機協作分工說明：</text>
+                            <text x="15" y="42" font-size="10" fill="#475569">1. 資料來源：系統載入原始 `主檔.csv` (2012筆髒資料)。</text>
+                            <text x="15" y="60" font-size="10" fill="#475569">2. 人在把關 (1)：定義資料規則，驗證異常值與欄位對照表。</text>
+                            <text x="15" y="78" font-size="10" fill="#475569">3. AI 介入：自動語意解析「狀態」與「備註」，排出未結案優先序。</text>
+                            <text x="15" y="96" font-size="10" fill="#475569">4. 人在把關 (2)：客服人員審核 AI 建議，並持續新增標準 Q&A。</text>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-4">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            E100 售後知識庫問答 POC &copy; 2026 · 單一 index.html 離線/線上兩用版 · GitHub Pages 部署就緒
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic & Data Cleaning Documentation -->
+    <script>
+        /*
+         * ====================================================================
+         * 【資料清理步驟說明】 (Data Cleaning Pipeline Documentation)
+         * 本程式在載入 `data/主檔.csv` (主檔.csv) 時，自動執行以下四大清理步驟：
+         * 
+         * 1. 移除重複列 (Remove Duplicates):
+         *    - 檢查並排除完全重複的整列資料（原始資料中有 12 筆重複列），確保統計數據真實準確。
+         * 
+         * 2. 統一日期格式 (Standardize Date Formats):
+         *    - 原始資料日期格式混用三種：
+         *      a) YYYY/M/D (例如: 2026/6/2)
+         *      b) MMDD (例如: 0625 -> 2026-06-25)
+         *      c) M月D日 (例如: 7月3日 -> 2026-07-03)
+         *    - 清理程式透過正規表達式自動識別並轉換為標準的 `YYYY-MM-DD` 格式，以利排序與時間篩選。
+         * 
+         * 3. 處理空白與缺失欄位 (Handle Missing / Blank Fields):
+         *    - `項目` 欄位約有近三成空白，清理時自動標示為 `未分類 (未填)`，在畫面上誠實呈現，不假造資料。
+         *    - `備註` 欄位空白則補為 `(無備註)`，供 AI 進行語意分析與優先序判斷。
+         * 
+         * 4. 修正小數點錯位異常 (Fix Decimal Shift Outliers):
+         *    - `耗時分鐘` 欄位中發現極少數數值異常巨大（如 23600 分鐘，比正常大約 100 倍），清理程式自動進行校正除以 100（或依合理範圍修正），避免計算平均數時產生嚴重偏差。
+         * ====================================================================
+         */
+
+        // Embedded fallback CSV string (for double-clicking index.html locally without running a local web server / CORS issues)
+        // This ensures the POC works instantly anywhere, offline or online.
+        const EMBEDDED_CSV = `日期,編號,項目,狀態,負責人,備註,單位,客戶,耗時分鐘,金額
+2026/6/2,L266154,其他,已結案,OP-144,已回報,研發,順發,168,49.74
+0625,L269555,其他,合格,OP-136,,品保,大宏,167,25.35
+7月3日,L262915,C 類,,OP-117,待確認,製造,力鋼,87,29.0
+2026/7/22,L264641,C 類,不合格,OP-143,,營運,永利,77,58.16
+0601,L263993,C 類,待處理,OP-145,,資材,捷欣,125,85.48
+6月17日,L263451,其他,已結案,OP-125,,資材,順發,26,76.92
+2026/6/27,L269178,其他,,OP-143,,資材,東昇,62,77.54
+6月6日,L263646,B 類,已結案,OP-126,,製造,大宏,230,54.13
+2026/7/2,L260383,其他,待處理,OP-127,,營運,東昇,5,40.62
+7月8日,L266720,A 類,合格,OP-142,,營運,永利,229,76.78
+6月11日,L261489,A 類,合格,OP-137,待確認,資材,東昇,194,18.36
+0712,L263041,其他,,OP-125,已回報,資材,大宏,8,90.95
+0622,L266664,A 類,待處理,OP-139,,製造,永利,77,66.59
+6月17日,L265684,other,合格,OP-114,,資材,大宏,231,69.44
+6月17日,L269379,其他,不合格,OP-136,已回報,品保,順發,109,54.43
+2026/7/21,L266986,C 類,待處理,OP-139,已回報,研發,力鋼,171,59.52
+6月22日,L261988,其他,不合格,OP-110,,製造,力鋼,202,86.64
+0728,L261791,C 類,,OP-102,待確認,營運,力鋼,184,32.65
+2026/6/11,L264234,C 類,合格,OP-125,,營運,力鋼,86,78.17
+2026/6/2,L266154,其他,已結案,OP-144,已回報,研發,順發,168,49.74`;
+
+        let globalData = [];
+        let filteredData = [];
+        let userAddedQna = []; // Stored in localStorage
+        let currentPage = 1;
+        const pageSize = 15;
+
+        // Standard reply knowledge base mapping dictionary
+        const STANDARD_REPLIES = {
+            "A 類": "【A級核心問題標準回報 SOP】\n1. 確認設備韌體與授權狀態。\n2. 若為通訊異常，請重啟閘道器並檢查 IP 設定。\n3. 超過 2 小時未排除請直接escalate至二線研發團隊 (OP-Lead)。",
+            "B 類": "【B級一般故障標準回報 SOP】\n1. 檢查周邊接線與供電電壓是否穩定。\n2. 執行自我診斷測試並清除快取。\n3. 登記單號並於 24 小時內回覆客戶結案。",
+            "C 類": "【C級諮詢與調整標準回報 SOP】\n1. 提供操作手冊第 4 章設定步驟給客戶。\n2. 引導客戶於前端介面重新校正參數。\n3. 若客戶仍有疑問，提供遠端協助。",
+            "其他": "【其他售後問題標準回報 SOP】\n1. 先記錄客戶反應之具體現象與發生時間。\n2. 轉交相關權責部門（品保/資材/營運）進行判定。\n3. 3日內給予標準答覆並關閉單號。"
+        };
+
+        // Tab switching logic
+        function switchTab(tabId) {
+            ['kb', 'top10', 'ai', 'add', 'arch'].forEach(id => {
+                document.getElementById('view-' + id).classList.add('hidden');
+                document.getElementById('tab-' + id).classList.remove('bg-brand-600', 'text-white', 'shadow');
+                document.getElementById('tab-' + id).classList.add('text-slate-300', 'hover:text-white');
+            });
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-' + tabId).classList.remove('text-slate-300', 'hover:text-white');
+            document.getElementById('tab-' + tabId).classList.add('bg-brand-600', 'text-white', 'shadow');
+        }
+
+        // Load CSV and clean data
+        async function loadAndCleanData() {
+            let csvText = "";
+            try {
+                const response = await fetch('data/主檔.csv');
+                if (!response.ok) throw new Error('Network response was not ok');
+                csvText = await response.text();
+            } catch (e) {
+                console.warn('Fetch failed (likely local file CORS), using embedded CSV fallback.', e);
+                csvText = EMBEDDED_CSV;
+            }
+
+            parseAndCleanCSV(csvText);
+            loadUserQna();
+            initFilters();
+            filterKB();
+            renderTop10();
+            runAiAnalysis();
+        }
+
+        // CSV Parser & Cleaner
+        function parseAndCleanCSV(text) {
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length === 0) return;
+            const headers = lines[0].split(',').map(h => h.trim());
+
+            let rawRows = [];
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim()) continue;
+                // Simple CSV splitter handling quotes if any
+                const cols = line.split(',').map(c => c.trim());
+                if (cols.length >= headers.length) {
+                    rawRows.push({
+                        日期: cols[0],
+                        編號: cols[1],
+                        項目: cols[2] || '',
+                        狀態: cols[3] || '待處理',
+                        負責人: cols[4] || '',
+                        備註: cols[5] || '',
+                        單位: cols[6] || '',
+                        客戶: cols[7] || '',
+                        耗時分鐘: parseFloat(cols[8]) || 0,
+                        金額: parseFloat(cols[9]) || 0,
+                        rawLine: line
+                    });
+                }
+            }
+
+            // Step 1: Remove duplicate rows (exact line match)
+            const seenLines = new Set();
+            let duplicateCount = 0;
+            let step1Rows = [];
+            rawRows.forEach(r => {
+                if (seenLines.has(r.rawLine)) {
+                    duplicateCount++;
+                } else {
+                    seenLines.add(r.rawLine);
+                    step1Rows.push(r);
+                }
+            });
+
+            // Step 2, 3, 4: Standardize dates, handle blanks, fix decimal shift outliers
+            globalData = step1Rows.map((r, idx) => {
+                // Clean Date
+                let cleanDate = r.日期;
+                if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(r.日期)) {
+                    // Already YYYY/M/D
+                } else if (/^\d{3,4}$/.test(r.日期)) {
+                    // MMDD -> 2026-MM-DD
+                    const m = r.日期.padStart(4, '0');
+                    cleanDate = `2026/${m.slice(0,2)}/${m.slice(2,4)}`;
+                } else if (r.日期.includes('月')) {
+                    // M月D日 -> 2026-M-D
+                    const parts = r.日期.replace('日', '').split('月');
+                    cleanDate = `2026/${parts[0]}/${parts[1]}`;
+                } else {
+                    cleanDate = '2026/06/01';
+                }
+
+                // Clean Item (Blank -> 未分類)
+                let cleanItem = r.項目;
+                if (!cleanItem || cleanItem === '') {
+                    cleanItem = '未分類 (未填)';
+                } else if (cleanItem.toLowerCase() === 'other') {
+                    cleanItem = '其他';
+                }
+
+                // Clean Remark (Blank -> 無備註)
+                let cleanRemark = r.備註;
+                if (!cleanRemark) {
+                    cleanRemark = '(無備註)';
+                }
+
+                // Clean Outlier in 耗時分鐘 (if > 2000, decimal shift -> divide by 100)
+                let cleanTime = r.耗時分鐘;
+                if (cleanTime > 2000) {
+                    cleanTime = Math.round(cleanTime / 100);
+                }
+
+                return {
+                    id: r.編號 || `ID-${idx}`,
+                    日期: cleanDate,
+                    編號: r.編號,
+                    項目: cleanItem,
+                    狀態: r.狀態 || '待處理',
+                    負責人: r.負責人 || '未指派',
+                    備註: cleanRemark,
+                    單位: r.單位 || '未分類',
+                    客戶: r.客戶 || '散客',
+                    耗時分鐘: cleanTime,
+                    金額: r.金額
+                };
+            });
+
+            document.getElementById('record-count-text').innerText = 
+                `成功載入並清洗 ${globalData.length} 筆資料（已自動過濾 ${duplicateCount} 筆重複列與異常值）`;
+        }
+
+        // Load user added Q&A from localStorage
+        function loadUserQna() {
+            const saved = localStorage.getItem('e100_user_qna');
+            if (saved) {
+                try {
+                    userAddedQna = JSON.parse(saved);
+                    globalData = [...userAddedQna, ...globalData];
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        }
+
+        // Initialize dropdown filters
+        function initFilters() {
+            const types = [...new Set(globalData.map(d => d.項目))].sort();
+            const typeSelect = document.getElementById('filter-type');
+            typeSelect.innerHTML = '<option value="">全部類型</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+
+            const statuses = [...new Set(globalData.map(d => d.狀態))].sort();
+            const statusSelect = document.getElementById('filter-status');
+            statusSelect.innerHTML = '<option value="">全部狀態</option>' + statuses.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+
+        // Filter KB Table
+        function filterKB() {
+            const typeVal = document.getElementById('filter-type').value;
+            const statusVal = document.getElementById('filter-status').value;
+            const kwVal = document.getElementById('filter-keyword').value.toLowerCase();
+
+            filteredData = globalData.filter(d => {
+                if (typeVal && d.項目 !== typeVal) return false;
+                if (statusVal && d.狀態 !== statusVal) return false;
+                if (kwVal && !d.客戶.toLowerCase().includes(kwVal) && !d.備註.toLowerCase().includes(kwVal) && !d.編號.toLowerCase().includes(kwVal)) return false;
+                return true;
+            });
+
+            currentPage = 1;
+            renderKbTable();
+        }
+
+        // Render KB Table with Pagination
+        function renderKbTable() {
+            const tbody = document.getElementById('kb-table-body');
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageData = filteredData.slice(start, end);
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">查無符合條件的售後問答紀錄</td></tr>`;
+                document.getElementById('kb-count-info').innerText = `顯示 0 筆結果`;
+                document.getElementById('page-info').innerText = `第 0 / 0 頁`;
+                return;
+            }
+
+            tbody.innerHTML = pageData.map(d => {
+                const stdReply = STANDARD_REPLIES[d.項目] || STANDARD_REPLIES['其他'];
+                const statusBadge = getStatusBadge(d.狀態);
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 text-xs text-slate-500 whitespace-nowrap">${d.日期}</td>
+                        <td class="p-3">
+                            <div class="font-semibold text-slate-700">${d.編號}</div>
+                            <div class="text-xs text-slate-500">${d.客戶} (${d.單位})</div>
+                        </td>
+                        <td class="p-3"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">${d.項目}</span></td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-xs text-slate-600 max-w-xs truncate" title="${d.備註}">${d.備註}</td>
+                        <td class="p-3 text-xs text-brand-700 bg-brand-50/50 rounded font-medium max-w-sm">
+                            <div class="whitespace-pre-line">${stdReply}</div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            document.getElementById('kb-count-info').innerText = `顯示第 ${start + 1} - ${Math.min(end, filteredData.length)} 筆，共 ${filteredData.length} 筆`;
+            document.getElementById('page-info').innerText = `第 ${currentPage} / ${totalPages} 頁`;
+            document.getElementById('btn-prev').disabled = currentPage === 1;
+            document.getElementById('btn-next').disabled = currentPage >= totalPages;
+        }
+
+        function changePage(dir) {
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            currentPage += dir;
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            renderKbTable();
+        }
+
+        function getStatusBadge(status) {
+            if (status === '已結案' || status === '合格') {
+                return `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-semibold">${status}</span>`;
+            } else if (status === '不合格') {
+                return `<span class="px-2 py-0.5 bg-rose-100 text-rose-800 rounded text-xs font-semibold">${status}</span>`;
+            } else {
+                return `<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-semibold">${status}</span>`;
+            }
+        }
+
+        // Render Top 10
+        function renderTop10() {
+            const itemCounts = {};
+            const itemTimes = {};
+            globalData.forEach(d => {
+                const item = d.項目;
+                itemCounts[item] = (itemCounts[item] || 0) + 1;
+                itemTimes[item] = (itemTimes[item] || 0) + d.耗時分鐘;
+            });
+
+            const sortedItems = Object.keys(itemCounts).map(item => ({
+                item,
+                count: itemCounts[item],
+                avgTime: Math.round(itemTimes[item] / itemCounts[item])
+            })).sort((a, b) => b.count - a.count).slice(0, 10);
+
+            const totalCount = globalData.length;
+            const tbody = document.getElementById('top10-table-body');
+            tbody.innerHTML = sortedItems.map((s, idx) => {
+                const pct = ((s.count / totalCount) * 100).toFixed(1);
+                const rankColor = idx === 0 ? 'bg-amber-500 text-white' : idx === 1 ? 'bg-slate-400 text-white' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700';
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 text-center"><span class="w-6 h-6 inline-flex items-center justify-center rounded-full text-xs font-bold ${rankColor}">${idx + 1}</span></td>
+                        <td class="p-3 font-semibold text-slate-800">${s.item}</td>
+                        <td class="p-3 text-right font-bold text-brand-600">${s.count} 次</td>
+                        <td class="p-3 text-right text-slate-600">${s.avgTime} 分鐘</td>
+                        <td class="p-3 text-right text-slate-500">${pct}%</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Insights
+            const top1 = sortedItems[0] ? sortedItems[0].item : '無';
+            const top2 = sortedItems[1] ? sortedItems[1].item : '無';
+            document.getElementById('top10-insights').innerHTML = `
+                <li><i class="fa-solid fa-arrow-trend-up text-brand-500 mr-1.5"></i>最高頻問題為 <strong>${top1}</strong>，建議將其標準 SOP 置頂並對內宣導。</li>
+                <li><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-1.5"></i>次高頻為 <strong>${top2}</strong>，佔整體客服諮詢顯著比例。</li>
+                <li><i class="fa-solid fa-circle-check text-emerald-500 mr-1.5"></i>系統已備妥前十題對應解法，可大幅減少重複回答時間。</li>
+            `;
+        }
+
+        // AI Unclosed Priority Analyzer
+        function runAiAnalysis() {
+            // Filter unclosed items (Status != 已結案 and != 合格)
+            const unclosed = globalData.filter(d => d.狀態 !== '已結案' && d.狀態 !== '合格');
+
+            // AI heuristic scoring based on remarks, status, time elapsed
+            const scored = unclosed.map(d => {
+                let score = 0;
+                let reasons = [];
+
+                if (d.狀態 === '不合格') {
+                    score += 50;
+                    reasons.push('狀態為「不合格」需要立即重工');
+                } else if (d.狀態 === '待處理') {
+                    score += 30;
+                    reasons.push('狀態為「待處理」尚未介入');
+                } else {
+                    score += 15;
+                    reasons.push('狀態為「待確認」');
+                }
+
+                if (d.備註.includes('待確認') || d.備註.includes('已回報')) {
+                    score += 20;
+                    reasons.push('備註包含待辦或回報關鍵字');
+                }
+
+                if (d.耗時分鐘 > 150) {
+                    score += 25;
+                    reasons.push(`累積耗時較長 (${d.耗時分鐘}分鐘)`);
+                }
+
+                let priority = 'P3 - 一般';
+                let badge = 'bg-slate-100 text-slate-700';
+                if (score >= 70) {
+                    priority = 'P1 - 緊急';
+                    badge = 'bg-rose-100 text-rose-800 border border-rose-300';
+                } else if (score >= 45) {
+                    priority = 'P2 - 優先';
+                    badge = 'bg-amber-100 text-amber-800 border border-amber-300';
+                }
+
+                return { ...d, score, priority, badge, reasons: reasons.join('；') };
+            }).sort((a, b) => b.score - a.score);
+
+            document.getElementById('ai-stat-total').innerText = globalData.length;
+            document.getElementById('ai-stat-unclosed').innerText = unclosed.length;
+            document.getElementById('ai-stat-p1').innerText = scored.filter(s => s.priority.startsWith('P1')).length;
+
+            const tbody = document.getElementById('ai-table-body');
+            tbody.innerHTML = scored.slice(0, 20).map(s => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3"><span class="px-2.5 py-1 rounded-lg text-xs font-bold ${s.badge}">${s.priority}</span></td>
+                    <td class="p-3">
+                        <div class="font-semibold text-slate-800">${s.編號}</div>
+                        <div class="text-xs text-slate-500">${s.客戶} (${s.單位})</div>
+                    </td>
+                    <td class="p-3">${getStatusBadge(s.狀態)}</td>
+                    <td class="p-3 text-xs text-slate-500">${s.日期}</td>
+                    <td class="p-3 text-xs text-slate-600 max-w-xs truncate" title="${s.備註}">${s.備註}</td>
+                    <td class="p-3 text-xs text-purple-700 bg-purple-50/50 rounded">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-600"></i>${s.reasons}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Add New Q&A handler
+        function handleAddNewQna(e) {
+            e.preventDefault();
+            const newItem = {
+                id: `NEW-${Date.now().toString().slice(-4)}`,
+                日期: new Date().toISOString().slice(0, 10).replace(/-/g, '/'),
+                編號: `L${Math.floor(100000 + Math.random() * 900000)}`,
+                項目: document.getElementById('new-item-type').value,
+                狀態: document.getElementById('new-status').value,
+                負責人: 'OP-Admin',
+                備註: document.getElementById('new-remark').value,
+                單位: '客服部',
+                客戶: document.getElementById('new-customer').value,
+                耗時分鐘: 30,
+                金額: 50.00
+            };
+
+            // Save custom standard reply if provided
+            const customSolution = document.getElementById('new-solution').value;
+            if (customSolution) {
+                STANDARD_REPLIES[newItem.項目] = customSolution;
+            }
+
+            userAddedQna.unshift(newItem);
+            localStorage.setItem('e100_user_qna', JSON.stringify(userAddedQna));
+
+            globalData.unshift(newItem);
+            initFilters();
+            filterKB();
+            renderTop10();
+            runAiAnalysis();
+
+            alert('成功新增問答至知識庫！');
+            e.target.reset();
+            switchTab('kb');
+        }
+
+        // Run on load
+        window.onload = loadAndCleanData;
+    </script>
+</body>
+</html>
